@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docker Deep Dive Quiz · shek8s</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #080b0f;
+  --bg2:     #0d1117;
+  --bg3:     #111820;
+  --border:  #1e2d3d;
+  --border2: #2a3f55;
+  --text:    #cdd9e5;
+  --muted:   #546e7a;
+  --dim:     #37474f;
+  --blue:    #58a6ff;
+  --blue-dim:#0d2a4a;
+  --green:   #39d353;
+  --green-dim:#1a4a2e;
+  --amber:   #d29922;
+  --amber-dim:#3a2800;
+  --red:     #f85149;
+  --red-dim: #3d0c09;
+  --purple:  #bc8cff;
+  --purple-dim:#2d1f52;
+  --cyan:    #00f5d4;
+  --cyan-dim:rgba(0,245,212,0.06);
+  --mono: 'JetBrains Mono','Fira Code','Cascadia Code','Courier New',monospace;
+  --sans: -apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,245,212,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,245,212,0.015) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+nav {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 2rem;
+  background: rgba(8,11,15,0.92);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+.nav-logo { font-family: var(--mono); font-size: 14px; color: var(--cyan); text-decoration: none; }
+.nav-logo span { color: var(--muted); }
+.nav-yt {
+  font-family: var(--mono); font-size: 12px; color: var(--muted);
+  text-decoration: none; display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  transition: color 0.15s, border-color 0.15s;
+}
+.nav-yt:hover { color: var(--text); border-color: #8b949e; }
+
+main {
+  position: relative; z-index: 1;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+}
+
+/* ── start screen ── */
+.hero-tag {
+  font-family: var(--mono); font-size: 11px; color: var(--cyan);
+  letter-spacing: 2px; text-transform: uppercase;
+  display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem;
+}
+.hero-tag::before { content:''; display:inline-block; width:28px; height:1px; background:var(--cyan); }
+
+h1 {
+  font-size: clamp(28px,5vw,44px); font-weight: 700;
+  letter-spacing: -1.2px; line-height: 1.08;
+  color: var(--text); margin-bottom: 10px;
+}
+h1 .hl { color: var(--cyan); }
+
+.hero-sub { font-size: 15px; color: var(--muted); margin-bottom: 2rem; line-height: 1.6; }
+
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 2rem; }
+.chip {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  padding: 4px 12px; border-radius: 20px; border: 1px solid; letter-spacing: 0.3px;
+}
+.chip-img    { background:var(--blue-dim);   color:var(--blue);   border-color:rgba(88,166,255,0.3); }
+.chip-layer  { background:var(--amber-dim);  color:var(--amber);  border-color:rgba(210,153,34,0.3); }
+.chip-cmd    { background:var(--green-dim);  color:var(--green);  border-color:rgba(57,211,83,0.3); }
+.chip-reg    { background:var(--purple-dim); color:var(--purple); border-color:rgba(188,140,255,0.3); }
+.chip-scan   { background:var(--red-dim);    color:var(--red);    border-color:rgba(248,81,73,0.3); }
+
+.filter-label { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+.filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 2rem; }
+.fbtn {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 6px 16px;
+  font-size: 13px; color: var(--muted); cursor: pointer;
+  font-family: var(--sans); transition: all 0.15s;
+}
+.fbtn:hover { color: var(--text); border-color: #8b949e; }
+.fbtn.on { background: var(--cyan-dim); border-color: var(--cyan); color: var(--cyan); }
+
+.start-btn {
+  background: var(--cyan); color: #080b0f;
+  border: none; border-radius: var(--radius-sm);
+  padding: 12px 26px; font-size: 14px; font-weight: 700;
+  font-family: var(--mono); cursor: pointer; letter-spacing: 0.3px;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.start-btn:hover { opacity: 0.88; }
+.start-btn:active { transform: scale(0.98); }
+
+/* ── progress ── */
+.pbar { background: var(--bg3); border-radius: 4px; height: 4px; margin-bottom: 1.5rem; overflow: hidden; }
+.pfill { background: var(--cyan); height: 4px; border-radius: 4px; transition: width 0.35s ease; }
+
+.meta-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--mono); font-size: 12px; color: var(--muted);
+  margin-bottom: 1rem;
+}
+.score-live { color: var(--cyan); }
+
+/* ── question card ── */
+.qcard {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.badge {
+  display: inline-block; font-family: var(--mono);
+  font-size: 10px; font-weight: 700; padding: 3px 10px;
+  border-radius: 20px; margin-bottom: 12px;
+  letter-spacing: 0.5px; text-transform: uppercase; border: 1px solid;
+}
+.badge-img    { background:var(--blue-dim);   color:var(--blue);   border-color:rgba(88,166,255,0.3); }
+.badge-layer  { background:var(--amber-dim);  color:var(--amber);  border-color:rgba(210,153,34,0.3); }
+.badge-cmd    { background:var(--green-dim);  color:var(--green);  border-color:rgba(57,211,83,0.3); }
+.badge-reg    { background:var(--purple-dim); color:var(--purple); border-color:rgba(188,140,255,0.3); }
+.badge-scan   { background:var(--red-dim);    color:var(--red);    border-color:rgba(248,81,73,0.3); }
+
+.qtxt {
+  font-size: 16px; font-weight: 600; line-height: 1.5;
+  color: var(--text); margin-bottom: 1rem;
+}
+
+.codeblock {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 14px 16px;
+  font-family: var(--mono); font-size: 12px; color: #a5d6ff;
+  line-height: 1.8; white-space: pre; overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.opt {
+  display: block; width: 100%; text-align: left;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 11px 14px;
+  margin: 8px 0; font-size: 13px; color: var(--text);
+  cursor: pointer; font-family: var(--sans);
+  transition: border-color 0.15s, background 0.15s; line-height: 1.5;
+}
+.opt:hover:not(:disabled) { border-color: #8b949e; background: var(--bg2); }
+.opt.correct { background: var(--green-dim); border-color: var(--green); color: #7ee787; }
+.opt.wrong   { background: var(--red-dim);   border-color: var(--red);   color: #ff7b72; }
+.opt:disabled { cursor: default; }
+.opt code { font-family: var(--mono); font-size: 11px; background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 3px; }
+
+.explanation {
+  font-size: 13px; color: var(--muted); background: var(--bg3);
+  border-radius: var(--radius-sm); padding: 12px 14px;
+  margin-top: 12px; border-left: 3px solid var(--cyan);
+  line-height: 1.7; display: none;
+}
+.explanation .exp-head { font-family: var(--mono); font-size: 10px; color: var(--cyan); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+.explanation code { font-family: var(--mono); font-size: 11px; background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 3px; color: #a5d6ff; }
+
+.nav-row { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
+.nbtn {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 9px 20px;
+  font-size: 13px; font-family: var(--mono); color: var(--text); cursor: pointer;
+  transition: all 0.15s;
+}
+.nbtn:hover:not(:disabled) { border-color: #8b949e; }
+.nbtn:disabled { opacity: 0.3; cursor: default; }
+
+/* ── result ── */
+.rcard {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 2.5rem 1.5rem; text-align: center;
+}
+.rpct { font-family: var(--mono); font-size: 60px; font-weight: 700; letter-spacing: -2px; color: var(--cyan); }
+.rfrac { font-family: var(--mono); font-size: 16px; color: var(--muted); margin: 4px 0 8px; }
+.rmsg { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2rem; }
+
+.breakdown { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem; }
+.bki {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px 18px;
+  font-family: var(--mono); font-size: 11px; min-width: 115px;
+}
+.bki .bnum { font-size: 20px; font-weight: 700; margin-top: 4px; }
+
+.retry-btn {
+  background: transparent; border: 1px solid var(--cyan);
+  color: var(--cyan); border-radius: var(--radius-sm);
+  padding: 10px 24px; font-size: 13px; font-weight: 700;
+  font-family: var(--mono); cursor: pointer; transition: background 0.15s;
+}
+.retry-btn:hover { background: var(--cyan-dim); }
+
+footer {
+  position: relative; z-index: 1;
+  border-top: 1px solid var(--border); padding: 1.5rem 2rem;
+  text-align: center; font-family: var(--mono); font-size: 12px; color: var(--muted);
+}
+footer a { color: var(--cyan); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
+@media (max-width: 500px) {
+  main { padding: 2rem 1rem 4rem; }
+  nav { padding: 12px 1rem; }
+  h1 { font-size: 28px; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="https://youtube.com/@shek8s">☸ shek8s<span> / docker quiz</span></a>
+  <a class="nav-yt" href="https://youtube.com/@shek8s" target="_blank">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
+    shek8s
+  </a>
+</nav>
+
+<main>
+
+  <!-- START -->
+  <div id="start">
+    <div class="hero-tag">docker deep dive</div>
+    <h1>How well do you<br>know <span class="hl">Docker</span>?</h1>
+    <p class="hero-sub">25 advanced questions on images, layers, commands, registries, and image scanning. Explanations included after every answer.</p>
+
+    <div class="chips">
+      <span class="chip chip-img">Images</span>
+      <span class="chip chip-layer">Layers</span>
+      <span class="chip chip-cmd">Commands</span>
+      <span class="chip chip-reg">Registry</span>
+      <span class="chip chip-scan">Scanning</span>
+    </div>
+
+    <p class="filter-label">Filter by topic</p>
+    <div class="filter-row">
+      <button class="fbtn on" onclick="tog('all',this)">All topics</button>
+      <button class="fbtn" onclick="tog('img',this)">Images</button>
+      <button class="fbtn" onclick="tog('layer',this)">Layers</button>
+      <button class="fbtn" onclick="tog('cmd',this)">Commands</button>
+      <button class="fbtn" onclick="tog('reg',this)">Registry</button>
+      <button class="fbtn" onclick="tog('scan',this)">Image scanning</button>
+    </div>
+    <button class="start-btn" onclick="go()">Start quiz →</button>
+  </div>
+
+  <!-- QUIZ -->
+  <div id="qscreen" style="display:none">
+    <div class="pbar"><div class="pfill" id="pf" style="width:0%"></div></div>
+    <div class="meta-row">
+      <span id="qm">Question 1 of 25</span>
+      <span class="score-live" id="sl">✓ 0 correct</span>
+    </div>
+    <div class="qcard">
+      <span class="badge" id="qb"></span>
+      <div class="qtxt" id="qt"></div>
+      <div id="qcode"></div>
+      <div id="opts"></div>
+      <div class="explanation" id="exp">
+        <div class="exp-head">💡 Explanation</div>
+        <span id="exptext"></span>
+      </div>
+    </div>
+    <div class="nav-row">
+      <button class="nbtn" id="nb" onclick="nxt()" disabled>Next question →</button>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="rscreen" style="display:none">
+    <div class="rcard">
+      <div class="rpct" id="rpct"></div>
+      <div class="rfrac" id="rfrac"></div>
+      <div class="rmsg" id="rmsg"></div>
+      <div class="breakdown" id="bk"></div>
+      <button class="retry-btn" onclick="rst()">Try again →</button>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <a href="https://youtube.com/@shek8s" target="_blank">youtube.com/@shek8s</a> · docker · kubernetes · helm · argo cd
+</footer>
+
+<script>
+const TOPICS = {
+  img:   { label: 'Images',         cls: 'badge-img',   color: '#58a6ff' },
+  layer: { label: 'Image layers',   cls: 'badge-layer', color: '#d29922' },
+  cmd:   { label: 'Commands',       cls: 'badge-cmd',   color: '#39d353' },
+  reg:   { label: 'Registry',       cls: 'badge-reg',   color: '#bc8cff' },
+  scan:  { label: 'Image scanning', cls: 'badge-scan',  color: '#f85149' },
+};
+
+const ALL = [
+  { t:'img', q:'What does the instruction `COPY --chown=node:node . .` do in a Dockerfile?',
+    o:['Copies files and sets ownership to the node user and group','Copies only files owned by the node user','Changes ownership of existing files without copying','Runs a chown command inside the container at runtime'],
+    a:0, exp:'The `--chown` flag on `COPY` (and `ADD`) sets the user and group ownership of the copied files in a single layer, avoiding a separate `RUN chown` instruction that would add an extra layer.' },
+
+  { t:'img', q:'What is the difference between `ADD` and `COPY` in a Dockerfile?',
+    o:['ADD compresses files; COPY does not','COPY is identical to ADD','ADD can fetch remote URLs and auto-extract tar archives; COPY only copies local files','ADD only works with URLs'],
+    a:2, exp:'`COPY` is the preferred instruction for copying local files — explicit and predictable. `ADD` has two extra behaviours: fetching from remote URLs and auto-extracting .tar archives, which can cause surprising results if not intended.' },
+
+  { t:'img', q:'What does `docker image prune -a` do?',
+    o:['Removes all stopped containers','Removes all images including those used by running containers','Removes all unused images, not just dangling ones','Removes only dangling (untagged) images'],
+    a:2, exp:'Without `-a`, `docker image prune` removes only dangling images. With `-a` it removes ALL images not currently referenced by any container — be careful in production environments.' },
+
+  { t:'img', q:'Which base image produces the smallest possible Docker image for a compiled Go binary?',
+    o:['ubuntu:22.04','alpine:3.18','scratch','debian:slim'],
+    a:2, exp:'`scratch` is a special empty image with no filesystem at all. A statically compiled Go binary can run directly from `FROM scratch`, producing images of only a few MB — ideal for production microservices.' },
+
+  { t:'img', q:'What is a multi-stage build primarily used for?',
+    code: 'FROM golang:1.21 AS builder\nWORKDIR /app\nCOPY . .\nRUN go build -o myapp .\n\nFROM scratch\nCOPY --from=builder /app/myapp /myapp\nENTRYPOINT ["/myapp"]',
+    o:['Running multiple services in one container','Keeping build dependencies out of the final image to reduce size','Building images for multiple CPU architectures','Enabling layer caching across projects'],
+    a:1, exp:'Multi-stage builds let you use a full build environment (compilers, SDKs, dev tools) in intermediate stages, then copy only the final artifact into a minimal production image. The result is often 10–100x smaller.' },
+
+  { t:'img', q:'What happens when you tag the same image with two different tags?',
+    o:['Docker creates a full copy of the image data','Both tags point to the same image ID — no data is duplicated','The original tag is automatically removed','Docker merges the image layers'],
+    a:1, exp:'Tags are simply aliases (pointers) to an image ID. Multiple tags can point to the same image without duplicating any layer data. This is how `latest` and a version tag like `v1.2.3` can reference the same image.' },
+
+  { t:'img', q:'What does the `.dockerignore` file control?',
+    o:['Which layers are excluded from the final image','Which files are excluded from the build context sent to the Docker daemon','Which base images are allowed in Dockerfiles','Which ports are blocked during build'],
+    a:1, exp:'`.dockerignore` works like `.gitignore` — it prevents specified files and directories from being sent to the Docker daemon as part of the build context. Excluding `node_modules`, `.git`, and test files significantly speeds up builds and reduces context size.' },
+
+  { t:'layer', q:'Which Dockerfile instructions create a new image layer?',
+    o:['Only RUN','RUN, COPY, and ADD','Every instruction including ENV and LABEL','Only FROM and RUN'],
+    a:1, exp:'`RUN`, `COPY`, and `ADD` create new layers that add to image size. Instructions like `ENV`, `LABEL`, `EXPOSE`, `ARG`, and `CMD` create metadata layers with negligible size impact.' },
+
+  { t:'layer', q:'Why is this Dockerfile inefficient from a layer caching perspective?',
+    code: 'FROM node:20-alpine\nCOPY . .\nRUN npm ci',
+    o:['npm ci is too slow','Copying all files first means any code change invalidates the npm ci cache','The node:20-alpine base is too large','COPY cannot be used before RUN'],
+    a:1, exp:'Cache invalidation cascades top-to-bottom. If you copy everything first, any source file change busts the `npm ci` layer. Fix: `COPY package*.json ./` first, `RUN npm ci`, then `COPY . .` — dependencies only reinstall when package files change.' },
+
+  { t:'layer', q:'What command lets you inspect every layer of an image and what was added?',
+    o:['docker image inspect','docker history <image>','docker diff <container>','docker layer ls'],
+    a:1, exp:'`docker history <image>` shows each layer, the instruction that created it, and its size. For a more detailed filesystem diff per layer, tools like `dive` provide an interactive TUI explorer.' },
+
+  { t:'layer', q:'What is a "dangling" image?',
+    o:['A layer with no parent layer','An untagged image with no references from any tagged image','A layer that failed to build','A layer larger than 100 MB'],
+    a:1, exp:'Dangling images are untagged images (shown as `<none>:<none>`) no longer referenced by any tagged image. They accumulate after repeated builds and can be cleaned with `docker image prune`.' },
+
+  { t:'layer', q:'How does Docker determine whether to use a cached layer during build?',
+    o:['By comparing the instruction string and the checksum of any files copied','By checking timestamps of source files only','By comparing the layer size to the previous build','Caching is random — there is no determinism'],
+    a:0, exp:'For `RUN` instructions Docker compares the instruction string. For `COPY`/`ADD` it also checksums the files being copied. If either differs from the last build, the cache is invalidated from that point downward.' },
+
+  { t:'layer', q:'What is the Copy-on-Write (CoW) strategy in Docker image layers?',
+    o:['Files are copied when an image is pushed to a registry','When a running container modifies a file, it is copied to the writable container layer before modification','All layers are copied to disk when a container starts','Docker copies files from host to container on first access'],
+    a:1, exp:'Image layers are read-only. When a container writes to a file that exists in a read-only layer, Docker copies that file up to the writable container layer first, then modifies it there. The original layer is untouched.' },
+
+  { t:'cmd', q:'What is the difference between `CMD` and `ENTRYPOINT` when both are defined?',
+    code: 'ENTRYPOINT ["python", "app.py"]\nCMD ["--port", "8080"]',
+    o:['CMD overrides ENTRYPOINT completely','CMD provides default arguments to ENTRYPOINT; CMD args can be overridden at runtime','ENTRYPOINT is ignored when CMD is present','They always run sequentially as separate processes'],
+    a:1, exp:'When both are set, `ENTRYPOINT` is the fixed executable and `CMD` supplies default arguments. Running `docker run myimage --port 9090` replaces CMD args but keeps ENTRYPOINT. Use `--entrypoint /bin/sh` to override the entrypoint itself.' },
+
+  { t:'cmd', q:'What does `docker run --rm` do?',
+    o:['Removes the image after the container exits','Removes the container filesystem when the container exits','Runs the container with a read-only filesystem','Removes all environment variables'],
+    a:1, exp:'`--rm` automatically removes the container (its writable layer and metadata) when it exits. Useful for one-off commands and CI pipelines to avoid accumulating stopped containers.' },
+
+  { t:'cmd', q:'What is the effect of `docker exec -it mycontainer /bin/sh`?',
+    o:['Creates a new container from the same image','Opens an interactive shell inside the already-running container','Restarts the container with a new command','Pauses the container and opens a debug shell'],
+    a:1, exp:'`docker exec` runs a new process inside an existing running container, inheriting its namespaces. `-i` keeps stdin open and `-t` allocates a pseudo-TTY, together enabling an interactive shell session.' },
+
+  { t:'cmd', q:'What does `docker build --no-cache .` do?',
+    o:['Deletes the build cache after building','Builds the image without using any cached layers','Disables layer creation entirely','Runs the build offline without pulling base images'],
+    a:1, exp:'`--no-cache` forces Docker to execute every instruction fresh, ignoring any cached layers from previous builds. Useful when you need fresh package installations or when debugging caching issues.' },
+
+  { t:'cmd', q:'Which command shows real-time resource usage (CPU, memory, network) for running containers?',
+    o:['docker inspect --stats','docker ps --metrics','docker stats','docker top'],
+    a:2, exp:'`docker stats` streams live metrics for all running containers (or specific ones). `docker top` shows processes inside a container, and `docker inspect` gives static metadata — neither provide live resource streams.' },
+
+  { t:'cmd', q:'What does `docker save myimage:latest | gzip > myimage.tar.gz` produce?',
+    o:['A compressed Dockerfile','A portable tar archive of the image including all layers and metadata that can be loaded with docker load','A compressed build context','A backup of running container state'],
+    a:1, exp:'`docker save` exports an image to a tar archive containing all layers, the manifest, and config JSON. `docker load` imports it back. This is useful for air-gapped environments or moving images without a registry.' },
+
+  { t:'reg', q:'What is the full image reference format when pushing to Docker Hub?',
+    o:['imagename:tag','registry/imagename:tag','username/imagename:tag','hub.docker.com/username/imagename:tag'],
+    a:2, exp:'Docker Hub uses `username/repository:tag`. For private registries the full format is `registry-hostname:port/repository:tag`, e.g. `myregistry.example.com:5000/myapp:v1.2`.' },
+
+  { t:'reg', q:'What is an OCI image manifest?',
+    o:['A Dockerfile stored in the registry','A JSON document describing an image\'s layers, config, and media types per the OCI Image Spec','A signature file used to verify image authenticity','A compressed archive of all image layers'],
+    a:1, exp:'An OCI manifest is a JSON descriptor listing the image config blob and each layer blob by digest and media type. Registries use manifests to serve the correct image for a given tag, and they form the basis of multi-arch manifest lists.' },
+
+  { t:'reg', q:'What does `docker manifest inspect ubuntu:22.04` reveal that `docker image inspect` does not?',
+    o:['The image\'s environment variables','The multi-arch manifest list — all platform variants (amd64, arm64, etc.) behind the tag','The full layer history with commands','The image\'s exposed ports'],
+    a:1, exp:'`docker manifest inspect` queries the registry and shows a manifest list (fat manifest) referencing separate manifests per platform. `docker image inspect` only shows the locally pulled variant for the current machine\'s architecture.' },
+
+  { t:'reg', q:'What does `docker login` actually store on your system?',
+    o:['Nothing — credentials are kept in memory only','A plaintext password in ~/.docker/config.json or a credential helper token','An encrypted certificate in the system keychain','A session cookie that expires after 24 hours'],
+    a:1, exp:'By default `docker login` stores base64-encoded credentials in `~/.docker/config.json` (not encrypted). In production, configure a `credStore` credential helper to delegate to the OS keychain or a secrets manager.' },
+
+  { t:'reg', q:'What is the purpose of a registry pull-through cache?',
+    o:['To push images to multiple registries simultaneously','To cache image pulls so repeated pulls hit the cache instead of the upstream registry','To sign images before they are pushed','To scan images automatically on push'],
+    a:1, exp:'A pull-through cache proxies and caches images from an upstream registry (e.g. Docker Hub). Subsequent pulls of the same image are served from the cache, reducing egress costs, rate-limit hits, and improving pull speed in air-gapped environments.' },
+
+  { t:'scan', q:'What does a Docker image vulnerability scanner primarily analyse?',
+    o:['Dockerfile instructions for insecure patterns','OS packages and application dependencies in image layers against known CVE databases','The running container\'s network connections','The image\'s resource usage at runtime'],
+    a:1, exp:'Scanners like Trivy, Grype, Snyk, and Docker Scout inventory OS packages (apt, apk, rpm) and language dependencies (npm, pip, go.sum, Maven) in each layer, then cross-reference against vulnerability databases like NVD, OSV, and vendor advisories.' },
+
+  { t:'scan', q:'Why does scanning a `scratch`-based image typically return fewer CVEs than `ubuntu:22.04`?',
+    o:['scratch images are automatically patched by Docker','scratch has no OS packages — there is nothing for the scanner to match CVEs against','ubuntu images are not scanned by default','CVE databases only cover Alpine-based images'],
+    a:1, exp:'Scanners match OS packages against CVE databases. A `scratch` image contains only your binary and no OS packages, so the attack surface is minimal and most CVEs have nothing to match against — a key security argument for distroless and scratch-based images.' },
+
+  { t:'scan', q:'What is an SBOM (Software Bill of Materials) in the context of container security?',
+    o:['A Dockerfile lint report','A structured inventory of all software components and dependencies in an image','A list of open ports in a container','A Docker Compose dependency graph'],
+    a:1, exp:'An SBOM is a machine-readable inventory (in formats like SPDX or CycloneDX) of every component in a software artifact. For container images it lists OS packages, libraries, and versions — enabling automated vulnerability matching, licence compliance, and supply-chain audits.' },
+
+  { t:'scan', q:'Which command runs a Trivy vulnerability scan on a local image?',
+    o:['trivy scan myimage:latest','trivy image myimage:latest','docker scan --trivy myimage:latest','trivy check image myimage:latest'],
+    a:1, exp:'`trivy image <imagename>` scans a local or remote image. Trivy is one of the most widely used open-source scanners and also supports scanning filesystems, Git repos, and Kubernetes clusters with the same CLI.' },
+
+  { t:'scan', q:'What is image signing and which tool implements it in the OCI ecosystem?',
+    o:['Encrypting image layers before pushing — implemented with docker encrypt','Cryptographically attesting image integrity and provenance — implemented with Cosign (Sigstore)','Adding a checksum file to the image — implemented with docker checksum','Compressing image layers — implemented with Zstandard'],
+    a:1, exp:'Cosign (part of the Sigstore project) signs OCI images by attaching a cryptographic signature as a registry artifact. Verification confirms the image has not been tampered with and was signed by a trusted key or OIDC identity — enforceable via Kyverno or OPA Gatekeeper.' },
+];
+
+let qs=[], cur=0, score=0, filter='all';
+let tc={}, sc={};
+
+function tog(f, el) {
+  filter = f;
+  document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('on'));
+  el.classList.add('on');
+}
+
+function go() {
+  qs = (filter === 'all' ? [...ALL] : ALL.filter(q => q.t === filter))
+       .sort(() => Math.random() - 0.5);
+  cur = 0; score = 0; tc = {}; sc = {};
+  document.getElementById('start').style.display = 'none';
+  document.getElementById('rscreen').style.display = 'none';
+  document.getElementById('qscreen').style.display = 'block';
+  render();
+}
+
+function render() {
+  const q = qs[cur];
+  document.getElementById('pf').style.width = (cur / qs.length * 100) + '%';
+  document.getElementById('qm').textContent = 'Question ' + (cur + 1) + ' of ' + qs.length;
+  document.getElementById('sl').textContent = '✓ ' + score + ' correct';
+
+  const b = document.getElementById('qb');
+  b.textContent = TOPICS[q.t].label;
+  b.className = 'badge ' + TOPICS[q.t].cls;
+
+  document.getElementById('qt').textContent = q.q;
+
+  const cd = document.getElementById('qcode');
+  cd.innerHTML = q.code ? '<div class="codeblock">' + q.code + '</div>' : '';
+
+  document.getElementById('exp').style.display = 'none';
+  document.getElementById('nb').disabled = true;
+
+  const od = document.getElementById('opts'); od.innerHTML = '';
+  q.o.forEach((o, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.innerHTML = o.replace(/`([^`]+)`/g, '<code>$1</code>');
+    btn.onclick = () => pick(i);
+    od.appendChild(btn);
+  });
+}
+
+function pick(i) {
+  const q = qs[cur];
+  const btns = document.querySelectorAll('.opt');
+  btns.forEach(b => b.disabled = true);
+  btns[q.a].classList.add('correct');
+  if (i !== q.a) btns[i].classList.add('wrong');
+  else { score++; sc[q.t] = (sc[q.t] || 0) + 1; }
+  tc[q.t] = (tc[q.t] || 0) + 1;
+  document.getElementById('sl').textContent = '✓ ' + score + ' correct';
+  document.getElementById('exptext').innerHTML = q.exp.replace(/`([^`]+)`/g, '<code>$1</code>');
+  document.getElementById('exp').style.display = 'block';
+  document.getElementById('nb').disabled = false;
+}
+
+function nxt() {
+  cur++;
+  if (cur >= qs.length) result();
+  else render();
+}
+
+function result() {
+  document.getElementById('qscreen').style.display = 'none';
+  document.getElementById('rscreen').style.display = 'block';
+  const pct = Math.round(score / qs.length * 100);
+  document.getElementById('rpct').textContent = pct + '%';
+  document.getElementById('rfrac').textContent = score + ' / ' + qs.length + ' correct';
+  const msgs = [
+    [100, '🏆 Perfect score — Docker master!'],
+    [80,  '⚡ Excellent — you know your containers.'],
+    [60,  '👍 Solid foundation — keep digging.'],
+    [40,  '📚 Good start — review the Docker docs.'],
+    [0,   '🌱 Keep going — the layers will make sense!']
+  ];
+  document.getElementById('rmsg').textContent = msgs.find(([t]) => pct >= t)[1];
+
+  const bk = document.getElementById('bk'); bk.innerHTML = '';
+  Object.entries(TOPICS).filter(([k]) => tc[k]).forEach(([k, v]) => {
+    const d = document.createElement('div');
+    d.className = 'bki';
+    d.innerHTML = '<span style="color:' + v.color + '">' + v.label + '</span>'
+      + '<div class="bnum" style="color:' + v.color + '">' + (sc[k] || 0) + '/' + tc[k] + '</div>';
+    bk.appendChild(d);
+  });
+}
+
+function rst() {
+  document.getElementById('rscreen').style.display = 'none';
+  document.getElementById('start').style.display = 'block';
+}
+</script>
+</body>
+</html>
